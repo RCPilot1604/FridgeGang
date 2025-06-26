@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState } from "react"; // Removed useEffect and useCallback as they were unused
 import {
   View,
   Text,
@@ -20,6 +20,7 @@ interface GroceryItem {
   category: string;
 }
 
+// OmitId type is good, no changes needed here.
 type OmitId<T> = Omit<T, "id">;
 
 interface ExpiryInfo {
@@ -27,6 +28,7 @@ interface ExpiryInfo {
   text: string;
 }
 
+// formatDate function is good, no changes needed.
 const formatDate = (isoString: string): string =>
   isoString
     ? new Date(isoString).toLocaleDateString("en-US", {
@@ -36,6 +38,7 @@ const formatDate = (isoString: string): string =>
       })
     : "N/A";
 
+// getExpiryInfo function is good, no changes needed.
 const getExpiryInfo = (expiryDate?: string): ExpiryInfo => {
   if (!expiryDate) return { color: "#9CA3AF", text: "N/A" };
   const today = new Date();
@@ -52,15 +55,25 @@ const getExpiryInfo = (expiryDate?: string): ExpiryInfo => {
 };
 
 export default function HomeScreen() {
-  const [hasPermission, setHasPermission] = useState<boolean | null>(null);
+  // REMOVED: Unused 'hasPermission' state. It's now managed within QRScanner.
+  // const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [isScannerVisible, setScannerVisible] = useState(false);
   const [groceryItems, setGroceryItems] = useState<GroceryItem[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>("All");
 
-  const categories = ["All", "Produce", "Dairy", "Meat", "Pantry", "Frozen", "Other"];
+  const categories = [
+    "All",
+    "Produce",
+    "Dairy",
+    "Meat",
+    "Pantry",
+    "Frozen",
+    "Other",
+  ];
 
   const handleScanSuccess = ({ data }: { data: string }) => {
-    setScannerVisible(false);
+    // This function now correctly receives data from the QRScanner component
+    setScannerVisible(false); // Close the scanner immediately
     try {
       const parsed = JSON.parse(data);
       if (
@@ -70,17 +83,23 @@ export default function HomeScreen() {
         parsed.category
       ) {
         const newItem: GroceryItem = { ...parsed, id: uuidv4() };
-        setGroceryItems((prev) => [...prev, newItem]);
+        setGroceryItems((prev) =>
+          [...prev, newItem].sort(
+            (a, b) =>
+              new Date(a.expiry_date).getTime() -
+              new Date(b.expiry_date).getTime()
+          )
+        ); // Added sorting
       } else {
         Alert.alert("Invalid QR Code", "Missing required data fields.");
       }
     } catch {
-      Alert.alert("Invalid QR Code", "Could not parse QR code.");
+      Alert.alert("Invalid QR Code", "Could not parse QR code data.");
     }
   };
 
   const handleDeleteItem = (id: string) => {
-    Alert.alert("Delete Item", "Are you sure?", [
+    Alert.alert("Delete Item", "Are you sure you want to delete this item?", [
       { text: "Cancel", style: "cancel" },
       {
         text: "Delete",
@@ -102,6 +121,7 @@ export default function HomeScreen() {
       <Text style={styles.header}>Fresh Track</Text>
 
       <View style={styles.categoryContainer}>
+        {/* Category logic is fine */}
         {categories.map((cat) => (
           <TouchableOpacity
             key={cat}
@@ -128,16 +148,30 @@ export default function HomeScreen() {
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}
         ListEmptyComponent={
-          <Text style={styles.empty}>Your grocery list is empty.</Text>
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyText}>Your grocery list is empty.</Text>
+            <Text style={styles.emptySubText}>
+              Tap "Scan New Item" to begin.
+            </Text>
+          </View>
         }
         renderItem={({ item }) => {
           const expiry = getExpiryInfo(item.expiry_date);
           return (
             <View style={styles.card}>
-              <View style={[styles.expiryBar, { backgroundColor: expiry.color }]} />
+              <View
+                style={[styles.expiryBar, { backgroundColor: expiry.color }]}
+              />
               <View style={styles.cardContent}>
-                <Text style={styles.itemName}>{item.item_name}</Text>
-                <Text style={styles.itemDetails}>Category: {item.category}</Text>
+                <View style={styles.cardHeader}>
+                  <Text style={styles.itemName}>{item.item_name}</Text>
+                  <TouchableOpacity onPress={() => handleDeleteItem(item.id)}>
+                    <Text style={styles.delete}>🗑️</Text>
+                  </TouchableOpacity>
+                </View>
+                <Text style={styles.itemDetails}>
+                  Category: {item.category}
+                </Text>
                 <Text style={styles.itemDetails}>
                   Purchased: {formatDate(item.purchase_date)}
                 </Text>
@@ -147,24 +181,25 @@ export default function HomeScreen() {
                 <Text style={[styles.expiryText, { color: expiry.color }]}>
                   {expiry.text}
                 </Text>
-                <TouchableOpacity onPress={() => handleDeleteItem(item.id)}>
-                  <Text style={styles.delete}>🗑️ Delete</Text>
-                </TouchableOpacity>
               </View>
             </View>
           );
         }}
       />
 
-      <TouchableOpacity
-        style={styles.scanButton}
-        onPress={() => setScannerVisible(true)}
-      >
-        <Text style={styles.scanButtonText}>📷 Scan New Item</Text>
-      </TouchableOpacity>
+      {/* The main scan button remains at the bottom of the screen */}
+      <View style={styles.scanButtonContainer}>
+        <TouchableOpacity
+          style={styles.scanButton}
+          onPress={() => setScannerVisible(true)}
+        >
+          <Text style={styles.scanButtonText}>📷 Scan New Item</Text>
+        </TouchableOpacity>
+      </View>
 
       <Modal visible={isScannerVisible} animationType="slide">
-        <QRScanner/>
+        {/* FIX: Pass the onScanSuccess function as a prop */}
+        <QRScanner onScanSuccess={handleScanSuccess} />
         <TouchableOpacity
           style={styles.closeButton}
           onPress={() => setScannerVisible(false)}
@@ -176,87 +211,133 @@ export default function HomeScreen() {
   );
 }
 
+// I've made some minor improvements to the styles for better UX
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff" },
-  header: { fontSize: 24, fontWeight: "bold", textAlign: "center", margin: 16 },
+  container: { flex: 1, backgroundColor: "#F1F5F9" }, // Changed background color slightly
+  header: {
+    fontSize: 28,
+    fontWeight: "bold",
+    textAlign: "center",
+    marginVertical: 16,
+    color: "#1F2937",
+  },
   categoryContainer: {
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "center",
     marginHorizontal: 10,
+    marginBottom: 10,
   },
   categoryButton: {
-    backgroundColor: "#E5E7EB",
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
+    backgroundColor: "#FFFFFF",
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
     margin: 4,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
   },
   categoryButtonSelected: {
     backgroundColor: "#22C55E",
+    borderColor: "#22C55E",
   },
-  categoryText: { color: "#374151", fontSize: 12 },
+  categoryText: { color: "#374151", fontSize: 14, fontWeight: "500" },
   categoryTextSelected: { color: "white" },
-  list: { padding: 16 },
-  empty: {
+  list: { paddingHorizontal: 16, paddingBottom: 100 }, // Added paddingBottom for scan button
+  emptyContainer: {
+    alignItems: "center",
+    marginTop: 60,
+  },
+  emptyText: {
+    textAlign: "center",
+    color: "#4B5563",
+    fontSize: 18,
+    fontWeight: "600",
+  },
+  emptySubText: {
     textAlign: "center",
     color: "#6B7280",
-    marginTop: 50,
+    marginTop: 8,
+    fontSize: 14,
   },
   card: {
     flexDirection: "row",
-    backgroundColor: "#F9FAFB",
+    backgroundColor: "#FFFFFF",
     marginBottom: 12,
-    borderRadius: 8,
+    borderRadius: 12,
     overflow: "hidden",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 2,
   },
-  expiryBar: { width: 6 },
+  expiryBar: { width: 8 },
   cardContent: {
     flex: 1,
-    padding: 12,
+    padding: 14,
+  },
+  cardHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: 4,
   },
   itemName: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: "bold",
     color: "#1F2937",
+    flex: 1, // Allow text to wrap if long
   },
   itemDetails: {
-    fontSize: 12,
+    fontSize: 13,
     color: "#6B7280",
+    marginTop: 2,
   },
   expiryText: {
-    marginTop: 6,
-    fontWeight: "600",
+    marginTop: 8,
+    fontWeight: "bold",
+    fontSize: 15,
   },
   delete: {
-    marginTop: 8,
-    color: "#EF4444",
-    fontSize: 14,
+    fontSize: 20, // Make emoji bigger
+    paddingLeft: 10, // Easier to tap
+  },
+  scanButtonContainer: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: 20,
+    backgroundColor: "transparent",
   },
   scanButton: {
-    position: "absolute",
-    bottom: 30,
-    left: 20,
-    right: 20,
     backgroundColor: "#22C55E",
-    padding: 16,
+    padding: 18,
     borderRadius: 32,
     alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
   },
   scanButtonText: {
     color: "white",
     fontWeight: "bold",
+    fontSize: 16,
   },
   closeButton: {
     position: "absolute",
-    bottom: 40,
-    alignSelf: "center",
-    backgroundColor: "#EF4444",
-    padding: 12,
-    borderRadius: 24,
+    top: 60, // Positioned at top for easier access
+    right: 20,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    padding: 10,
+    borderRadius: 20,
   },
   closeButtonText: {
     color: "white",
     fontWeight: "bold",
+    fontSize: 16,
   },
 });
