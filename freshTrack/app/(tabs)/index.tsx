@@ -43,10 +43,10 @@ interface ExpiryInfo {
 const formatDate = (isoString: string): string =>
   isoString
     ? new Date(isoString).toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    })
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      })
     : "N/A";
 
 const getExpiryInfo = (expiryDate?: string): ExpiryInfo => {
@@ -74,7 +74,6 @@ export default function HomeScreen() {
     return now;
   });
   const prevItemsRef = useRef([]);
-
 
   const categories = [
     "All",
@@ -107,7 +106,7 @@ export default function HomeScreen() {
   useEffect(() => {
     const prevItems = prevItemsRef.current;
     const addedItems = groceryItems.filter(
-      item => !prevItems.some(prev => prev.id === item.id)
+      (item) => !prevItems.some((prev) => prev.id === item.id)
     );
 
     groceryItems.forEach((item) => {
@@ -117,13 +116,17 @@ export default function HomeScreen() {
         (expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
       );
 
-      const isNewItem = addedItems.some(added => added.id === item.id);
+      const isNewItem = addedItems.some((added) => added.id === item.id);
 
-      if ((diffDays === 3 || diffDays <= 0) && (isNewItem || todayChanged(prevItemsRef.current))) {
+      if (
+        (diffDays === 3 || diffDays <= 0) &&
+        (isNewItem || todayChanged(prevItemsRef.current))
+      ) {
         sendNotification(
-          `${item.item_name} ${diffDays < 0
-            ? "has expired!"
-            : diffDays === 0
+          `${item.item_name} ${
+            diffDays < 0
+              ? "has expired!"
+              : diffDays === 0
               ? "expires today!"
               : "will expire in 3 days"
           }`
@@ -162,7 +165,10 @@ export default function HomeScreen() {
       }
 
       if (finalStatus !== "granted") {
-        Alert.alert("Permission required", "Enable notifications to get expiry alerts.");
+        Alert.alert(
+          "Permission required",
+          "Enable notifications to get expiry alerts."
+        );
         return;
       }
     } else {
@@ -172,54 +178,78 @@ export default function HomeScreen() {
 
   const handleScanSuccess = ({ data }: { data: string }) => {
     setScannerVisible(false);
-    // For debugging: Log the raw data scanned from the QR code to the console.
     console.log("Raw Scanned Data:", data);
 
     try {
-      // First, ensure the data is a non-empty string before trying to parse.
       if (typeof data !== "string" || data.trim() === "") {
         throw new Error("Scanned data is empty or not a string.");
       }
 
       const parsed = JSON.parse(data);
 
-      // Ensure the parsed data is a valid object.
-      if (typeof parsed !== "object" || parsed === null) {
-        throw new Error("Parsed data is not a valid JSON object.");
-      }
+      const itemsToProcess = Array.isArray(parsed) ? parsed : [parsed];
 
-      // Check for all required fields.
-      if (
-        parsed.item_name &&
-        parsed.expiry_date &&
-        parsed.purchase_date &&
-        parsed.category
-      ) {
-        const newItem: GroceryItem = { ...parsed, id: uuidv4() };
-        setGroceryItems((prev) =>
-          [...prev, newItem].sort(
-            (a, b) =>
-              new Date(a.expiry_date).getTime() -
-              new Date(b.expiry_date).getTime()
-          )
-        );
-      } else {
-        // If some fields are missing, identify which ones.
+      const newValidItems: GroceryItem[] = [];
+      const invalidItemMessages: string[] = [];
+
+      // Process each item from the QR code
+      for (const item of itemsToProcess) {
+        if (typeof item !== "object" || item === null) {
+          invalidItemMessages.push("An item was not a valid object.");
+          continue;
+        }
+
+        // Check for all required fields.
         const missingFields = [
           "item_name",
           "expiry_date",
           "purchase_date",
           "category",
-        ].filter((field) => !parsed[field]);
+        ].filter((field) => !item[field]);
+
+        if (missingFields.length === 0) {
+          // If valid, create a new item with a unique id.
+          const newItem: GroceryItem = { ...item, id: uuidv4() };
+          newValidItems.push(newItem);
+        } else {
+          // If some fields are missing, identify which ones.
+          const itemName = item.item_name || "Unknown Item";
+          invalidItemMessages.push(
+            `${itemName} is missing: ${missingFields.join(", ")}`
+          );
+        }
+      }
+
+      // Add any valid items to the grocery list.
+      if (newValidItems.length > 0) {
+        setGroceryItems((prev) =>
+          [...prev, ...newValidItems].sort(
+            (a, b) =>
+              new Date(a.expiry_date).getTime() -
+              new Date(b.expiry_date).getTime()
+          )
+        );
+      }
+
+      // If there were any invalid items, alert the user.
+      if (invalidItemMessages.length > 0) {
         Alert.alert(
-          "Invalid QR Code Structure",
-          `The QR code is valid JSON but is missing required fields: ${missingFields.join(
-            ", "
+          "Invalid Item Data",
+          `Some items could not be added:\n- ${invalidItemMessages.join(
+            "\n- "
           )}`
         );
       }
+
+      // If the QR code was valid JSON but no valid items were found.
+      if (newValidItems.length === 0 && itemsToProcess.length > 0) {
+        Alert.alert(
+          "No Valid Items Added",
+          "The QR code was scanned, but none of the items had the correct format."
+        );
+      }
     } catch (error) {
-      // Provide a more helpful error message to the user.
+      // This handles JSON parsing errors or other thrown errors.
       Alert.alert(
         "QR Code Parsing Error",
         "The scanned QR code does not contain the correct JSON format. Please ensure it's a valid text-based QR code with the required data structure.\n\nCheck the Metro console log to see the raw data that was scanned."
