@@ -14,6 +14,7 @@ import QRScanner from "@/components/QRScanner";
 import { v4 as uuidv4 } from "uuid";
 import * as Notifications from "expo-notifications";
 import * as Device from "expo-device";
+import { useNavigation } from "expo-router";
 
 // Allow notifications to show when app is foregrounded
 Notifications.setNotificationHandler({
@@ -43,10 +44,10 @@ interface ExpiryInfo {
 const formatDate = (isoString: string): string =>
   isoString
     ? new Date(isoString).toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-      })
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    })
     : "N/A";
 
 const getExpiryInfo = (expiryDate?: string): ExpiryInfo => {
@@ -78,6 +79,7 @@ export default function HomeScreen() {
     return now;
   });
   const prevItemsRef = useRef<GroceryItem[]>([]);
+  const navigation = useNavigation();
 
   const categories = [
     "All",
@@ -133,10 +135,9 @@ export default function HomeScreen() {
         (isNewItem || todayChanged(prevItemsRef.current))
       ) {
         sendNotification(
-          `${item.item_name} ${
-            diffDays < 0
-              ? "has expired!"
-              : diffDays === 0
+          `${item.item_name} ${diffDays < 0
+            ? "has expired!"
+            : diffDays === 0
               ? "expires today!"
               : "will expire in 3 days"
           }`
@@ -352,6 +353,16 @@ export default function HomeScreen() {
         >
           <Text style={styles.scanButtonText}>+</Text>
         </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.scanButton}
+          onPress={() =>
+            navigation.navigate("RecipeScreen", {
+              ingredients: groceryItems.map((item) => item.item_name),
+            })
+          }
+        >
+          <Text style={styles.scanButtonText}>Recipe</Text>
+        </TouchableOpacity>
       </View>
 
       {/* --- Scanner Modal --- */}
@@ -413,7 +424,7 @@ export default function HomeScreen() {
           </View>
         </View>
       </Modal>
-    </SafeAreaView>
+    </SafeAreaView >
   );
 }
 

@@ -54,10 +54,10 @@ export default function RecipeScreen() {
 
   return (
     <View style={styles.container}>
+      <TouchableOpacity onPress={handleBack}>
+        <Text style={styles.backText}>← Back</Text>
+      </TouchableOpacity>
       <View style={styles.header}>
-        <TouchableOpacity onPress={handleBack}>
-          <Text style={styles.backText}>← Back</Text>
-        </TouchableOpacity>
         <Text style={styles.headerTitle}>Generated Recipe</Text>
       </View>
       <ScrollView contentContainerStyle={styles.scrollContainer}>
