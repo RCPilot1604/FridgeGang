@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { View, Text, StyleSheet } from "react-native";
 import { Camera, CameraView } from "expo-camera";
 import { Dimensions } from "react-native";
@@ -7,15 +7,13 @@ interface QRScannerProps {
   onScanSuccess: ({ data }: { data: string }) => void;
 }
 
-// Define the size of the viewfinder
 const viewfinderSize = 250;
 const { height: screenHeight, width: screenWidth } = Dimensions.get("window");
 const maskVerticalHeight = (screenHeight - viewfinderSize) / 2;
 
-
 export default function QRScanner({ onScanSuccess }: QRScannerProps) {
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
-  const [scanned, setScanned] = useState(false);
+  const isScannedRef = useRef(false);
 
   useEffect(() => {
     const getCameraPermissions = async () => {
@@ -24,11 +22,13 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
     };
 
     getCameraPermissions();
+
+    isScannedRef.current = false;
   }, []);
 
   const handleBarCodeScanned = ({ data }: { data: string }) => {
-    if (!scanned) {
-      setScanned(true);
+    if (!isScannedRef.current) {
+      isScannedRef.current = true;
       onScanSuccess({ data });
     }
   };
@@ -58,23 +58,38 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
 
       <View style={styles.overlay}>
         {/* Top black area */}
-        <View style={{ height: maskVerticalHeight, backgroundColor: 'rgba(0,0,0,0.6)', width: '100%' }} />
+        <View
+          style={{
+            height: maskVerticalHeight,
+            backgroundColor: "rgba(0,0,0,0.6)",
+            width: "100%",
+          }}
+        />
 
         {/* Middle row with side masks and viewfinder */}
-        <View style={{ flexDirection: 'row' }}>
+        <View style={{ flexDirection: "row" }}>
           {/* Left black area */}
-          <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)' }} />
+          <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.6)" }} />
 
           {/* Transparent center (viewfinder) */}
           <View style={styles.viewfinder} />
 
           {/* Right black area */}
-          <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)' }} />
+          <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.6)" }} />
         </View>
 
         {/* Bottom black area */}
-        <View style={{ height: maskVerticalHeight, backgroundColor: 'rgba(0,0,0,0.6)', width: '100%', alignItems: 'center' }}>
-          <Text style={styles.promptText}>Align QR code within the frame to scan</Text>
+        <View
+          style={{
+            height: maskVerticalHeight,
+            backgroundColor: "rgba(0,0,0,0.6)",
+            width: "100%",
+            alignItems: "center",
+          }}
+        >
+          <Text style={styles.promptText}>
+            Align QR code within the frame to scan
+          </Text>
         </View>
       </View>
     </View>
@@ -86,7 +101,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    height: '100%',
+    height: "100%",
   },
   infoText: {
     textAlign: "center",
