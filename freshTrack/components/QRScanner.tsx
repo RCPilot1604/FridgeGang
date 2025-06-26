@@ -1,7 +1,7 @@
-// @/components/QRScanner.tsx
 import React, { useState, useEffect } from "react";
 import { View, Text, StyleSheet } from "react-native";
 import { Camera, CameraView } from "expo-camera";
+import { Dimensions } from "react-native";
 
 interface QRScannerProps {
   onScanSuccess: ({ data }: { data: string }) => void;
@@ -9,6 +9,9 @@ interface QRScannerProps {
 
 // Define the size of the viewfinder
 const viewfinderSize = 250;
+const { height: screenHeight, width: screenWidth } = Dimensions.get("window");
+const maskVerticalHeight = (screenHeight - viewfinderSize) / 2;
+
 
 export default function QRScanner({ onScanSuccess }: QRScannerProps) {
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
@@ -53,27 +56,25 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
         style={StyleSheet.absoluteFillObject}
       />
 
-      {/* This is the new scanner overlay */}
       <View style={styles.overlay}>
-        {/* Top mask */}
-        <View style={styles.mask} />
+        {/* Top black area */}
+        <View style={{ height: maskVerticalHeight, backgroundColor: 'rgba(0,0,0,0.6)', width: '100%' }} />
 
-        <View style={{ flexDirection: "row" }}>
-          {/* Left mask */}
-          <View style={styles.mask} />
+        {/* Middle row with side masks and viewfinder */}
+        <View style={{ flexDirection: 'row' }}>
+          {/* Left black area */}
+          <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)' }} />
 
-          {/* The Viewfinder */}
+          {/* Transparent center (viewfinder) */}
           <View style={styles.viewfinder} />
 
-          {/* Right mask */}
-          <View style={styles.mask} />
+          {/* Right black area */}
+          <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)' }} />
         </View>
 
-        {/* Bottom mask */}
-        <View style={[styles.mask, { alignItems: "center" }]}>
-          <Text style={styles.promptText}>
-            Align QR code within the frame to scan
-          </Text>
+        {/* Bottom black area */}
+        <View style={{ height: maskVerticalHeight, backgroundColor: 'rgba(0,0,0,0.6)', width: '100%', alignItems: 'center' }}>
+          <Text style={styles.promptText}>Align QR code within the frame to scan</Text>
         </View>
       </View>
     </View>
@@ -85,28 +86,23 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+    height: '100%',
   },
   infoText: {
     textAlign: "center",
     marginTop: 50,
     fontSize: 16,
   },
-  // New overlay styles
   overlay: {
     ...StyleSheet.absoluteFillObject,
     justifyContent: "center",
     alignItems: "center",
   },
-  mask: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.6)",
-  },
   viewfinder: {
     width: viewfinderSize,
     height: viewfinderSize,
-    borderColor: "white",
     borderWidth: 2,
-    borderRadius: 10,
+    borderColor: "white",
   },
   promptText: {
     fontSize: 16,
