@@ -66,14 +66,18 @@ const getExpiryInfo = (expiryDate?: string): ExpiryInfo => {
 
 export default function HomeScreen() {
   const [isScannerVisible, setScannerVisible] = useState(false);
+  const [isPreviewModalVisible, setPreviewModalVisible] = useState(false);
   const [groceryItems, setGroceryItems] = useState<GroceryItem[]>([]);
+  const [scannedItemsPreview, setScannedItemsPreview] = useState<GroceryItem[]>(
+    []
+  );
   const [selectedCategory, setSelectedCategory] = useState<string>("All");
   const [today, setToday] = useState(() => {
     const now = new Date();
     now.setHours(0, 0, 0, 0);
     return now;
   });
-  const prevItemsRef = useRef([]);
+  const prevItemsRef = useRef<GroceryItem[]>([]);
 
   const categories = [
     "All",
@@ -102,12 +106,18 @@ export default function HomeScreen() {
     return () => clearInterval(interval);
   }, [today]);
 
-  // Detect added items or new day
+  // Detect added items or new day for notifications
   useEffect(() => {
     const prevItems = prevItemsRef.current;
     const addedItems = groceryItems.filter(
       (item) => !prevItems.some((prev) => prev.id === item.id)
     );
+
+    function todayChanged(prevItems: GroceryItem[]) {
+      // A simple check to see if the date change should trigger notifications for existing items.
+      // This is true if the item list itself hasn't changed, implying only the date did.
+      return prevItems.length === groceryItems.length;
+    }
 
     groceryItems.forEach((item) => {
       const expiryDate = new Date(item.expiry_date);
@@ -137,11 +147,6 @@ export default function HomeScreen() {
     // Update previous items reference
     prevItemsRef.current = groceryItems;
   }, [groceryItems, today]);
-
-  function todayChanged(prevItems) {
-    // Trigger notifications for all items once per day
-    return prevItems.length === groceryItems.length;
-  }
 
   const sendNotification = async (message: string) => {
     await Notifications.scheduleNotificationAsync({
@@ -184,22 +189,17 @@ export default function HomeScreen() {
       if (typeof data !== "string" || data.trim() === "") {
         throw new Error("Scanned data is empty or not a string.");
       }
-
       const parsed = JSON.parse(data);
-
       const itemsToProcess = Array.isArray(parsed) ? parsed : [parsed];
-
       const newValidItems: GroceryItem[] = [];
       const invalidItemMessages: string[] = [];
 
-      // Process each item from the QR code
       for (const item of itemsToProcess) {
         if (typeof item !== "object" || item === null) {
           invalidItemMessages.push("An item was not a valid object.");
           continue;
         }
 
-        // Check for all required fields.
         const missingFields = [
           "item_name",
           "expiry_date",
@@ -208,11 +208,9 @@ export default function HomeScreen() {
         ].filter((field) => !item[field]);
 
         if (missingFields.length === 0) {
-          // If valid, create a new item with a unique id.
           const newItem: GroceryItem = { ...item, id: uuidv4() };
           newValidItems.push(newItem);
         } else {
-          // If some fields are missing, identify which ones.
           const itemName = item.item_name || "Unknown Item";
           invalidItemMessages.push(
             `${itemName} is missing: ${missingFields.join(", ")}`
@@ -220,43 +218,45 @@ export default function HomeScreen() {
         }
       }
 
-      // Add any valid items to the grocery list.
-      if (newValidItems.length > 0) {
-        setGroceryItems((prev) =>
-          [...prev, ...newValidItems].sort(
-            (a, b) =>
-              new Date(a.expiry_date).getTime() -
-              new Date(b.expiry_date).getTime()
-          )
-        );
-      }
-
-      // If there were any invalid items, alert the user.
       if (invalidItemMessages.length > 0) {
         Alert.alert(
           "Invalid Item Data",
-          `Some items could not be added:\n- ${invalidItemMessages.join(
-            "\n- "
-          )}`
+          `Some items could not be read:\n- ${invalidItemMessages.join("\n- ")}`
         );
       }
 
-      // If the QR code was valid JSON but no valid items were found.
-      if (newValidItems.length === 0 && itemsToProcess.length > 0) {
+      if (newValidItems.length > 0) {
+        setScannedItemsPreview(newValidItems);
+        setPreviewModalVisible(true);
+      } else if (itemsToProcess.length > 0) {
         Alert.alert(
-          "No Valid Items Added",
+          "No Valid Items Found",
           "The QR code was scanned, but none of the items had the correct format."
         );
       }
     } catch (error) {
-      // This handles JSON parsing errors or other thrown errors.
       Alert.alert(
         "QR Code Parsing Error",
-        "The scanned QR code does not contain the correct JSON format. Please ensure it's a valid text-based QR code with the required data structure.\n\nCheck the Metro console log to see the raw data that was scanned."
+        "The scanned QR code does not contain valid JSON data. Please check the console for the raw data.",
+        [{ text: "OK" }]
       );
-      // Also log the specific error to the console for detailed debugging.
       console.error("Failed to parse QR code:", error);
     }
+  };
+
+  const handleRemovePreviewItem = (id: string) => {
+    setScannedItemsPreview((prev) => prev.filter((item) => item.id !== id));
+  };
+
+  const handleConfirmAddItems = () => {
+    setGroceryItems((prev) =>
+      [...prev, ...scannedItemsPreview].sort(
+        (a, b) =>
+          new Date(a.expiry_date).getTime() - new Date(b.expiry_date).getTime()
+      )
+    );
+    setPreviewModalVisible(false);
+    setScannedItemsPreview([]);
   };
 
   const handleDeleteItem = (id: string) => {
@@ -310,9 +310,7 @@ export default function HomeScreen() {
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyText}>Your grocery list is empty.</Text>
-            <Text style={styles.emptySubText}>
-              Tap "Scan New Item" to begin.
-            </Text>
+            <Text style={styles.emptySubText}>Tap "+" to scan a new item.</Text>
           </View>
         }
         renderItem={({ item }) => {
@@ -356,6 +354,7 @@ export default function HomeScreen() {
         </TouchableOpacity>
       </View>
 
+      {/* --- Scanner Modal --- */}
       <Modal visible={isScannerVisible} animationType="slide">
         <QRScanner onScanSuccess={handleScanSuccess} />
         <TouchableOpacity
@@ -365,11 +364,59 @@ export default function HomeScreen() {
           <Text style={styles.closeButtonText}>x</Text>
         </TouchableOpacity>
       </Modal>
+
+      {/* --- NEW Confirmation Modal --- */}
+      <Modal
+        visible={isPreviewModalVisible}
+        animationType="fade"
+        transparent={true}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <Text style={styles.modalHeader}>Add Scanned Items</Text>
+            <FlatList
+              data={scannedItemsPreview}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item }) => (
+                <View style={styles.previewItemContainer}>
+                  <Text style={styles.previewItemText}>{item.item_name}</Text>
+                  <TouchableOpacity
+                    onPress={() => handleRemovePreviewItem(item.id)}
+                  >
+                    <Text style={styles.removeItemButton}>x</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+              ListEmptyComponent={
+                <Text style={styles.previewEmptyText}>
+                  All items were removed.
+                </Text>
+              }
+            />
+            <View style={styles.modalFooter}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={() => setPreviewModalVisible(false)}
+              >
+                <Text style={styles.modalButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.confirmButton]}
+                onPress={handleConfirmAddItems}
+                disabled={scannedItemsPreview.length === 0}
+              >
+                <Text style={styles.modalButtonText}>
+                  Add {scannedItemsPreview.length} Items
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
 
-// (Styles remain unchanged — truncated for brevity)
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F1F5F9" },
   header: {
@@ -474,9 +521,9 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     backgroundColor: "#22C55E",
-    padding: 10,
-    borderRadius: 32,
+    justifyContent: "center",
     alignItems: "center",
+    borderRadius: 30,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
@@ -487,21 +534,96 @@ const styles = StyleSheet.create({
     color: "white",
     fontWeight: "bold",
     fontSize: 30,
+    lineHeight: 32, // Adjust for better vertical alignment
   },
   closeButton: {
-    width: 30,
-    height: 30,
+    width: 35,
+    height: 35,
     position: "absolute",
     top: 60,
     right: 20,
     backgroundColor: "rgba(0, 0, 0, 0.5)",
-    padding: 3,
-    borderRadius: 20,
+    justifyContent: "center",
     alignItems: "center",
+    borderRadius: 20,
   },
   closeButtonText: {
     color: "white",
     fontWeight: "bold",
     fontSize: 18,
+  },
+  // --- NEW STYLES for Confirmation Modal ---
+  modalOverlay: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
+  },
+  modalContainer: {
+    width: "90%",
+    maxHeight: "80%",
+    backgroundColor: "white",
+    borderRadius: 12,
+    padding: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  modalHeader: {
+    fontSize: 20,
+    fontWeight: "bold",
+    marginBottom: 15,
+    textAlign: "center",
+    color: "#1F2937",
+  },
+  previewItemContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#E5E7EB",
+  },
+  previewItemText: {
+    fontSize: 16,
+    color: "#374151",
+    flex: 1,
+  },
+  removeItemButton: {
+    fontSize: 18,
+    color: "#EF4444",
+    fontWeight: "bold",
+    paddingHorizontal: 12,
+  },
+  previewEmptyText: {
+    textAlign: "center",
+    color: "#6B7280",
+    marginVertical: 20,
+    fontSize: 16,
+  },
+  modalFooter: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 20,
+  },
+  modalButton: {
+    flex: 1,
+    padding: 12,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  cancelButton: {
+    backgroundColor: "#9CA3AF",
+    marginRight: 10,
+  },
+  confirmButton: {
+    backgroundColor: "#22C55E",
+  },
+  modalButtonText: {
+    color: "white",
+    fontWeight: "bold",
+    fontSize: 16,
   },
 });
