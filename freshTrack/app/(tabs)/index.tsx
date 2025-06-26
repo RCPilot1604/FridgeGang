@@ -1,5 +1,5 @@
 import "react-native-get-random-values";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -12,6 +12,18 @@ import {
 } from "react-native";
 import QRScanner from "@/components/QRScanner";
 import { v4 as uuidv4 } from "uuid";
+import * as Notifications from "expo-notifications";
+import * as Device from "expo-device";
+
+// Allow notifications to show when app is foregrounded
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldPlaySound: true,
+    shouldSetBadge: true,
+    shouldShowBanner: true,
+    shouldShowList: true,
+  }),
+});
 
 interface GroceryItem {
   id: string;
@@ -31,10 +43,10 @@ interface ExpiryInfo {
 const formatDate = (isoString: string): string =>
   isoString
     ? new Date(isoString).toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-      })
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    })
     : "N/A";
 
 const getExpiryInfo = (expiryDate?: string): ExpiryInfo => {
@@ -56,6 +68,13 @@ export default function HomeScreen() {
   const [isScannerVisible, setScannerVisible] = useState(false);
   const [groceryItems, setGroceryItems] = useState<GroceryItem[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>("All");
+  const [today, setToday] = useState(() => {
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    return now;
+  });
+  const prevItemsRef = useRef([]);
+
 
   const categories = [
     "All",
@@ -66,8 +85,91 @@ export default function HomeScreen() {
     "Frozen",
     "Other",
   ];
+  // Ask for notification permissions on first load
+  useEffect(() => {
+    registerForPushNotificationsAsync();
+  }, []);
 
-  // UPDATED: This function is now more robust for debugging and error handling.
+  // Update today's date at midnight
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const newDate = new Date();
+      newDate.setHours(0, 0, 0, 0);
+      if (newDate.getTime() !== today.getTime()) {
+        setToday(newDate);
+      }
+    }, 60 * 1000); // check every minute
+
+    return () => clearInterval(interval);
+  }, [today]);
+
+  // Detect added items or new day
+  useEffect(() => {
+    const prevItems = prevItemsRef.current;
+    const addedItems = groceryItems.filter(
+      item => !prevItems.some(prev => prev.id === item.id)
+    );
+
+    groceryItems.forEach((item) => {
+      const expiryDate = new Date(item.expiry_date);
+      const now = new Date(today);
+      const diffDays = Math.ceil(
+        (expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
+      );
+
+      const isNewItem = addedItems.some(added => added.id === item.id);
+
+      if ((diffDays === 3 || diffDays <= 0) && (isNewItem || todayChanged(prevItemsRef.current))) {
+        sendNotification(
+          `${item.item_name} ${diffDays < 0
+            ? "has expired!"
+            : diffDays === 0
+              ? "expires today!"
+              : "will expire in 3 days"
+          }`
+        );
+      }
+    });
+
+    // Update previous items reference
+    prevItemsRef.current = groceryItems;
+  }, [groceryItems, today]);
+
+  function todayChanged(prevItems) {
+    // Trigger notifications for all items once per day
+    return prevItems.length === groceryItems.length;
+  }
+
+  const sendNotification = async (message: string) => {
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: "FreshTrack Reminder",
+        body: message,
+      },
+      trigger: null,
+    });
+  };
+
+  const registerForPushNotificationsAsync = async () => {
+    if (Device.isDevice) {
+      const { status: existingStatus } =
+        await Notifications.getPermissionsAsync();
+      let finalStatus = existingStatus;
+
+      if (existingStatus !== "granted") {
+        const { status } = await Notifications.requestPermissionsAsync();
+        finalStatus = status;
+      }
+
+      if (finalStatus !== "granted") {
+        Alert.alert("Permission required", "Enable notifications to get expiry alerts.");
+        return;
+      }
+    } else {
+      Alert.alert("Use a physical device for push notifications");
+    }
+  };
+
   const handleScanSuccess = ({ data }: { data: string }) => {
     setScannerVisible(false);
     // For debugging: Log the raw data scanned from the QR code to the console.
