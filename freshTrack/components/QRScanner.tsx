@@ -7,6 +7,9 @@ interface QRScannerProps {
   onScanSuccess: ({ data }: { data: string }) => void;
 }
 
+// Define the size of the viewfinder
+const viewfinderSize = 250;
+
 export default function QRScanner({ onScanSuccess }: QRScannerProps) {
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [scanned, setScanned] = useState(false);
@@ -21,10 +24,9 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
   }, []);
 
   const handleBarCodeScanned = ({ data }: { data: string }) => {
-    // Check if we've already processed a scan to prevent multiple triggers
     if (!scanned) {
-      setScanned(true); // Mark as scanned
-      onScanSuccess({ data }); // Pass the data back to the parent component
+      setScanned(true);
+      onScanSuccess({ data });
     }
   };
 
@@ -50,8 +52,29 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
         }}
         style={StyleSheet.absoluteFillObject}
       />
+
+      {/* This is the new scanner overlay */}
       <View style={styles.overlay}>
-        <Text style={styles.scanPrompt}>Scan a QR Code</Text>
+        {/* Top mask */}
+        <View style={styles.mask} />
+
+        <View style={{ flexDirection: "row" }}>
+          {/* Left mask */}
+          <View style={styles.mask} />
+
+          {/* The Viewfinder */}
+          <View style={styles.viewfinder} />
+
+          {/* Right mask */}
+          <View style={styles.mask} />
+        </View>
+
+        {/* Bottom mask */}
+        <View style={[styles.mask, { alignItems: "center" }]}>
+          <Text style={styles.promptText}>
+            Align QR code within the frame to scan
+          </Text>
+        </View>
       </View>
     </View>
   );
@@ -60,27 +83,37 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    flexDirection: "column",
     justifyContent: "center",
+    alignItems: "center",
   },
   infoText: {
     textAlign: "center",
     marginTop: 50,
     fontSize: 16,
   },
+  // New overlay styles
   overlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.4)",
     justifyContent: "center",
     alignItems: "center",
   },
-  scanPrompt: {
-    fontSize: 22,
+  mask: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
+  },
+  viewfinder: {
+    width: viewfinderSize,
+    height: viewfinderSize,
+    borderColor: "white",
+    borderWidth: 2,
+    borderRadius: 10,
+  },
+  promptText: {
+    fontSize: 16,
     color: "white",
     fontWeight: "bold",
-    borderWidth: 2,
-    borderColor: "white",
-    padding: 20,
-    borderRadius: 10,
+    textAlign: "center",
+    marginTop: 24,
+    maxWidth: "70%",
   },
 });
