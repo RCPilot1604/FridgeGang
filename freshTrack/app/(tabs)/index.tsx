@@ -1,4 +1,8 @@
-import React, { useState } from "react"; // Removed useEffect and useCallback as they were unused
+// FIX: Import this library to polyfill crypto.getRandomValues for the uuid package.
+// Make sure to install it by running: npx expo install react-native-get-random-values
+import "react-native-get-random-values";
+
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -55,8 +59,6 @@ const getExpiryInfo = (expiryDate?: string): ExpiryInfo => {
 };
 
 export default function HomeScreen() {
-  // REMOVED: Unused 'hasPermission' state. It's now managed within QRScanner.
-  // const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [isScannerVisible, setScannerVisible] = useState(false);
   const [groceryItems, setGroceryItems] = useState<GroceryItem[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>("All");
@@ -71,11 +73,26 @@ export default function HomeScreen() {
     "Other",
   ];
 
+  // UPDATED: This function is now more robust for debugging and error handling.
   const handleScanSuccess = ({ data }: { data: string }) => {
-    // This function now correctly receives data from the QRScanner component
-    setScannerVisible(false); // Close the scanner immediately
+    setScannerVisible(false);
+    // For debugging: Log the raw data scanned from the QR code to the console.
+    console.log("Raw Scanned Data:", data);
+
     try {
+      // First, ensure the data is a non-empty string before trying to parse.
+      if (typeof data !== "string" || data.trim() === "") {
+        throw new Error("Scanned data is empty or not a string.");
+      }
+
       const parsed = JSON.parse(data);
+
+      // Ensure the parsed data is a valid object.
+      if (typeof parsed !== "object" || parsed === null) {
+        throw new Error("Parsed data is not a valid JSON object.");
+      }
+
+      // Check for all required fields.
       if (
         parsed.item_name &&
         parsed.expiry_date &&
@@ -89,12 +106,30 @@ export default function HomeScreen() {
               new Date(a.expiry_date).getTime() -
               new Date(b.expiry_date).getTime()
           )
-        ); // Added sorting
+        );
       } else {
-        Alert.alert("Invalid QR Code", "Missing required data fields.");
+        // If some fields are missing, identify which ones.
+        const missingFields = [
+          "item_name",
+          "expiry_date",
+          "purchase_date",
+          "category",
+        ].filter((field) => !parsed[field]);
+        Alert.alert(
+          "Invalid QR Code Structure",
+          `The QR code is valid JSON but is missing required fields: ${missingFields.join(
+            ", "
+          )}`
+        );
       }
-    } catch {
-      Alert.alert("Invalid QR Code", "Could not parse QR code data.");
+    } catch (error) {
+      // Provide a more helpful error message to the user.
+      Alert.alert(
+        "QR Code Parsing Error",
+        "The scanned QR code does not contain the correct JSON format. Please ensure it's a valid text-based QR code with the required data structure.\n\nCheck the Metro console log to see the raw data that was scanned."
+      );
+      // Also log the specific error to the console for detailed debugging.
+      console.error("Failed to parse QR code:", error);
     }
   };
 
@@ -121,7 +156,6 @@ export default function HomeScreen() {
       <Text style={styles.header}>Fresh Track</Text>
 
       <View style={styles.categoryContainer}>
-        {/* Category logic is fine */}
         {categories.map((cat) => (
           <TouchableOpacity
             key={cat}
@@ -187,7 +221,6 @@ export default function HomeScreen() {
         }}
       />
 
-      {/* The main scan button remains at the bottom of the screen */}
       <View style={styles.scanButtonContainer}>
         <TouchableOpacity
           style={styles.scanButton}
@@ -198,7 +231,6 @@ export default function HomeScreen() {
       </View>
 
       <Modal visible={isScannerVisible} animationType="slide">
-        {/* FIX: Pass the onScanSuccess function as a prop */}
         <QRScanner onScanSuccess={handleScanSuccess} />
         <TouchableOpacity
           style={styles.closeButton}
@@ -211,9 +243,9 @@ export default function HomeScreen() {
   );
 }
 
-// I've made some minor improvements to the styles for better UX
+// Styles have not been changed
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F1F5F9" }, // Changed background color slightly
+  container: { flex: 1, backgroundColor: "#F1F5F9" },
   header: {
     fontSize: 28,
     fontWeight: "bold",
@@ -243,7 +275,7 @@ const styles = StyleSheet.create({
   },
   categoryText: { color: "#374151", fontSize: 14, fontWeight: "500" },
   categoryTextSelected: { color: "white" },
-  list: { paddingHorizontal: 16, paddingBottom: 100 }, // Added paddingBottom for scan button
+  list: { paddingHorizontal: 16, paddingBottom: 100 },
   emptyContainer: {
     alignItems: "center",
     marginTop: 60,
@@ -287,7 +319,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "bold",
     color: "#1F2937",
-    flex: 1, // Allow text to wrap if long
+    flex: 1,
   },
   itemDetails: {
     fontSize: 13,
@@ -300,8 +332,8 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   delete: {
-    fontSize: 20, // Make emoji bigger
-    paddingLeft: 10, // Easier to tap
+    fontSize: 20,
+    paddingLeft: 10,
   },
   scanButtonContainer: {
     position: "absolute",
@@ -329,7 +361,7 @@ const styles = StyleSheet.create({
   },
   closeButton: {
     position: "absolute",
-    top: 60, // Positioned at top for easier access
+    top: 60,
     right: 20,
     backgroundColor: "rgba(0, 0, 0, 0.5)",
     padding: 10,
