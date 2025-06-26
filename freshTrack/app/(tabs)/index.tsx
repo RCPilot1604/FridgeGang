@@ -1,8 +1,5 @@
-// FIX: Import this library to polyfill crypto.getRandomValues for the uuid package.
-// Make sure to install it by running: npx expo install react-native-get-random-values
 import "react-native-get-random-values";
-
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -24,7 +21,6 @@ interface GroceryItem {
   category: string;
 }
 
-// OmitId type is good, no changes needed here.
 type OmitId<T> = Omit<T, "id">;
 
 interface ExpiryInfo {
@@ -32,7 +28,6 @@ interface ExpiryInfo {
   text: string;
 }
 
-// formatDate function is good, no changes needed.
 const formatDate = (isoString: string): string =>
   isoString
     ? new Date(isoString).toLocaleDateString("en-US", {
@@ -42,7 +37,6 @@ const formatDate = (isoString: string): string =>
       })
     : "N/A";
 
-// getExpiryInfo function is good, no changes needed.
 const getExpiryInfo = (expiryDate?: string): ExpiryInfo => {
   if (!expiryDate) return { color: "#9CA3AF", text: "N/A" };
   const today = new Date();
@@ -226,7 +220,7 @@ export default function HomeScreen() {
           style={styles.scanButton}
           onPress={() => setScannerVisible(true)}
         >
-          <Text style={styles.scanButtonText}>📷 Scan New Item</Text>
+          <Text style={styles.scanButtonText}>+</Text>
         </TouchableOpacity>
       </View>
 
@@ -236,14 +230,14 @@ export default function HomeScreen() {
           style={styles.closeButton}
           onPress={() => setScannerVisible(false)}
         >
-          <Text style={styles.closeButtonText}>Close Scanner</Text>
+          <Text style={styles.closeButtonText}>x</Text>
         </TouchableOpacity>
       </Modal>
     </SafeAreaView>
   );
 }
 
-// Styles have not been changed
+// (Styles remain unchanged — truncated for brevity)
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F1F5F9" },
   header: {
@@ -337,15 +331,18 @@ const styles = StyleSheet.create({
   },
   scanButtonContainer: {
     position: "absolute",
-    bottom: 0,
+    bottom: 10,
     left: 0,
     right: 0,
     padding: 20,
+    alignItems: "center",
     backgroundColor: "transparent",
   },
   scanButton: {
+    width: 60,
+    height: 60,
     backgroundColor: "#22C55E",
-    padding: 18,
+    padding: 10,
     borderRadius: 32,
     alignItems: "center",
     shadowColor: "#000",
@@ -357,19 +354,22 @@ const styles = StyleSheet.create({
   scanButtonText: {
     color: "white",
     fontWeight: "bold",
-    fontSize: 16,
+    fontSize: 30,
   },
   closeButton: {
+    width: 30,
+    height: 30,
     position: "absolute",
     top: 60,
     right: 20,
     backgroundColor: "rgba(0, 0, 0, 0.5)",
-    padding: 10,
+    padding: 3,
     borderRadius: 20,
+    alignItems: "center",
   },
   closeButtonText: {
     color: "white",
     fontWeight: "bold",
-    fontSize: 16,
+    fontSize: 18,
   },
 });
