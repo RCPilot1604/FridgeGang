@@ -353,16 +353,6 @@ export default function HomeScreen() {
         >
           <Text style={styles.scanButtonText}>+</Text>
         </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.scanButton}
-          onPress={() =>
-            navigation.navigate("RecipeScreen", {
-              ingredients: groceryItems.map((item) => item.item_name),
-            })
-          }
-        >
-          <Text style={styles.scanButtonText}>Recipe</Text>
-        </TouchableOpacity>
       </View>
 
       {/* --- Scanner Modal --- */}
