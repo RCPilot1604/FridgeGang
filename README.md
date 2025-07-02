@@ -1,6 +1,6 @@
 # FreshTrack
 
-FreshTrack is a mobile application designed to help you keep track of your groceries, reduce food waste, and maintain an organized refrigerator. By scanning QR codes, you can effortlessly add items with their purchase and expiry dates, ensuring you always know what's fresh.
+FreshTrack is a mobile application designed to help you keep track of your groceries, reduce food waste, and maintain an organized refrigerator. By scanning QR codes, you can effortlessly add items with their expiry dates, ensuring you always know what's fresh.
 
 ## Prerequisites
 
@@ -46,7 +46,7 @@ Follow these steps to get the application running on your local machine and mobi
     Once it's running, a QR code will be displayed in the terminal. Make sure the output confirms it is `Using Expo Go`.
 
 5.  **Launch the App**
-    Open the **Expo Go** app on your phone and scan the QR code from your terminal. The FridgeGang app will build and launch on your device.
+    Open the **Expo Go** app on your phone and scan the QR code from your terminal. The FreshTrack app will build and launch on your device.
 
 ## 📱 Using the App
 
